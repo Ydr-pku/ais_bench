@@ -21,11 +21,11 @@ models = [
         url="",
         max_out_len=32768,
         batch_size=128,
-        trust_remote_code=False,
+        trust_remote_code=True,
         generation_kwargs=dict(
             temperature=0.6,
+            top_k=20,
             top_p=0.95,
-            repetition_penalty=1.05,
         ),
         pred_postprocessor=dict(type=extract_non_reasoning_content),
     )
