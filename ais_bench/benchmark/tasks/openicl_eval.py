@@ -439,6 +439,7 @@ class OpenICLEvalTask(BaseTask):
                 result['origin_prediction'] = pred_dicts[i]['prediction']
                 result['predictions'] = str(predictions[i])
                 result['references'] = str(references[i])
+            result['request_id'] = origin_prediction.get('request_id')
             results[str(i)] = result
         return results
 
@@ -524,4 +525,3 @@ if __name__ == '__main__':
     logger.info(f'Evaluation task time elapsed: {end_time - start_time:.2f}s')
     task_state_manager.update_task_state({"status": "finish"})
     manager_t.join()
-

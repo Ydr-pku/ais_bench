@@ -195,6 +195,8 @@ class VLLMCustomAPIChat(BaseAPIModel):
         await self._parse_usage(json_content, output)
 
     async def parse_text_response(self, json_content, output):
+        if request_id := json_content.get("id"):
+            output.extra_details_data["request_id"] = request_id
         for item in json_content.get("choices", []):
             if content:=item["message"].get("content"):
                 output.content += content
