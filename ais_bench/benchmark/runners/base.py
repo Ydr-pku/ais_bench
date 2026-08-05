@@ -167,19 +167,65 @@ class TasksMonitor:
         return data
 
     def _update_tasks_progress(self):
-        pbar = tqdm(total=len(self.tasks_state_map), desc="Monitoring tasks progress")
+        progress_scale = 10000
+        pbar = tqdm(
+            total=progress_scale,
+            desc="Monitoring tasks progress",
+            bar_format="{desc}: {percentage:6.2f}%|{bar}| {postfix}",
+        )
+        last_display = None
         while True:
             self._refresh_task_state()
             _ = self._get_task_states()
-            cur_count = 0
-            for _, state in self.tasks_state_map.items():
-                if state.get("status") == "finish" or state.get("status") == "error":
-                    cur_count += 1
+            progress_states = []
+            for task_name, state in self.tasks_state_map.items():
+                finish_count = state.get("finish_count")
+                total_count = state.get("total_count")
+                if (
+                    isinstance(finish_count, (int, float))
+                    and isinstance(total_count, (int, float))
+                    and total_count > 0
+                ):
+                    progress_states.append(
+                        (task_name, finish_count, total_count, state)
+                    )
 
-            if cur_count > pbar.n:
-                pbar.update(cur_count - pbar.n)
+            if progress_states:
+                progress_ratio = sum(
+                    min(max(finish_count / total_count, 0.0), 1.0)
+                    for _, finish_count, total_count, _ in progress_states
+                ) / len(progress_states)
+                pbar.n = round(progress_ratio * progress_scale)
+
+                if len(progress_states) == 1:
+                    _, finish_count, total_count, state = progress_states[0]
+                    phase = (
+                        state.get("progress_description")
+                        or state.get("status")
+                        or ""
+                    )
+                    display = (finish_count, total_count, phase)
+                    postfix = f"{finish_count}/{total_count} {phase}".rstrip()
+                else:
+                    display = tuple(
+                        (task_name, finish_count, total_count)
+                        for task_name, finish_count, total_count, _ in progress_states
+                    )
+                    postfix = f"{len(progress_states)} tasks"
+
+                if display != last_display:
+                    pbar.set_postfix_str(postfix, refresh=False)
+                    pbar.refresh()
+                    last_display = display
+
             # break when all the task finished
-            if cur_count >= pbar.total or self._is_all_task_done():
+            if self._is_all_task_done():
+                if all(
+                    state.get("status") == "finish"
+                    for state in self.tasks_state_map.values()
+                ):
+                    pbar.n = progress_scale
+                    pbar.refresh()
                 pbar.close()
                 break
             time.sleep(self.refresh_interval)

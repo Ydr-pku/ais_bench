@@ -203,21 +203,28 @@ class TestTasksMonitor(unittest.TestCase):
     @patch('ais_bench.benchmark.runners.base.time.sleep')
     def test_tasks_monitor_update_tasks_progress(self, mock_sleep, mock_tqdm,
                                                   mock_logger_class, mock_makedirs, mock_exists):
-        """Test _update_tasks_progress method."""
+        """Test request-level progress in background mode."""
         monitor = TasksMonitor(
-            task_names=self.task_names,
+            task_names=["task1"],
             output_path=self.output_path,
             is_debug=True
         )
 
-        # Mark tasks as finished
-        monitor.tasks_state_map["task1"]["status"] = "finish"
-        monitor.tasks_state_map["task2"]["status"] = "finish"
+        monitor.tasks_state_map["task1"].update({
+            "status": "finish",
+            "finish_count": 50,
+            "total_count": 100,
+            "progress_description": "Infer progress",
+        })
 
         mock_pbar = MagicMock()
         mock_tqdm.return_value = mock_pbar
         mock_pbar.n = 0
-        mock_pbar.total = 2
+        mock_pbar.total = 10000
+        refreshed_progress = []
+        mock_pbar.refresh.side_effect = lambda: refreshed_progress.append(
+            mock_pbar.n
+        )
 
         # Mock _refresh_task_state and _get_task_states
         monitor._refresh_task_state = MagicMock()
@@ -226,6 +233,11 @@ class TestTasksMonitor(unittest.TestCase):
 
         monitor._update_tasks_progress()
 
+        mock_pbar.set_postfix_str.assert_called_once_with(
+            "50/100 Infer progress", refresh=False
+        )
+        self.assertEqual(mock_pbar.n, 10000)
+        self.assertEqual(refreshed_progress, [5000, 10000])
         mock_pbar.close.assert_called_once()
 
 
@@ -289,4 +301,3 @@ class TestBaseRunner(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
